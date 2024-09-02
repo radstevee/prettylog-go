@@ -184,8 +184,10 @@ var LoggerSettings = struct {
 	LogFileNameFormat: "2006-01-02-150405",
 }
 
-var logFileName string = ""
-var logFile string = ""
+var (
+	logFileName string = ""
+	logFile     string = ""
+)
 
 func InitLoggerFileWriter() {
 	logFileName = time.Now().Format(LoggerSettings.LogFileNameFormat)
@@ -206,21 +208,23 @@ func InitLoggerFileWriter() {
 	}
 }
 
-func logToFile(message string, logType LogType) {
+func logToFile(message string, logType LogType) error {
 	time := time.Now().Format("2006-01-02 15:04:05")
 	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer file.Close()
 
 	content := fmt.Sprintf("%s [%s] %s\n", time, strings.ToUpper(logType.Name), message)
 	if _, err := file.WriteString(content); err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
 
-func Log(message string, logType LogType) {
+func Log(message string, logType LogType) error {
 	pattern := string(LoggerSettings.LoggerStyle)
 	if logType == Fatal {
 		pattern = string(FULL)
@@ -230,8 +234,11 @@ func Log(message string, logType LogType) {
 	fmt.Println(pattern + RESET)
 
 	if LoggerSettings.SaveToFile {
-		logToFile(message, logType)
+		err := logToFile(message, logType)
+		return err
 	}
+
+	return nil
 }
 
 func LogException(err error) {
@@ -239,7 +246,10 @@ func LogException(err error) {
 	scanner := bufio.NewScanner(strings.NewReader(stacktrace))
 
 	for scanner.Scan() {
-		Log(replaceAll(scanner.Text(), "\t", "  "), Exception)
+		err := Log(replaceAll(scanner.Text(), "\t", "  "), Exception)
+		if err != nil {
+			fmt.Errorf("failed to log error: %w", err)
+		}
 	}
 }
 

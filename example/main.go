@@ -7,13 +7,16 @@ import (
 	. "github.com/radstevee/prettylog"
 )
 
-var Death = errors.Errorf("Death")
-var StdlibError = e.New("Death from the stdlib")
+var (
+	Death       = errors.Errorf("Death")
+	StdlibError = e.New("Death from the stdlib")
+)
 
 func main() {
 	LoggerSettings.LoggerStyle = FULL
 	LoggerSettings.SaveToFile = true
 	LoggerSettings.SaveDirectoryPath = "./logs"
+	LoggerSettings.LoggerStyle = PREFIX
 	InitLoggerFileWriter()
 
 	Log("Running main() in Demo.go..", Debug)
