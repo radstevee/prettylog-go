@@ -3,7 +3,10 @@ package prettylog
 import (
 	"bufio"
 	"fmt"
+	"io/fs"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/go-errors/errors"
 )
@@ -133,45 +136,88 @@ var (
 )
 
 type LogType struct {
+	Emoji     string
 	Name      string
 	ColorPair AnsiPair
 }
 
 var (
-	Information = LogType{"ℹ️ Information", CyanPair}
-	Runtime     = LogType{"✨ Runtime", MagentaPair}
-	Debug       = LogType{"🔧 Debug", GrayPair}
-	Network     = LogType{"🔌 Network", BluePair}
-	Success     = LogType{"✔️ Success", BrightGreenPair}
-	Warning     = LogType{"⚠️ Warning", BrightYellowPair}
-	Error       = LogType{"⛔ Error", RedPair}
-	Exception   = LogType{"💣 Exception", RedPair}
-	Critical    = LogType{"🚨 Critical", BrightRedPair}
-	Audit       = LogType{"📋 Audit", YellowPair}
-	Trace       = LogType{"🔍 Trace", LightBluePair}
-	Security    = LogType{"🔒 Security", PurplePair}
-	UserAction  = LogType{"🧍 User Action", CutePinkPair}
-	Performance = LogType{"⏱️ Performance", PinkPair}
-	Config      = LogType{"⚙️ Config", LightGrayPair}
-	Fatal       = LogType{"☠️ Fatal", DarkRedPair}
+	Information = LogType{"ℹ️ ", "Information", CyanPair}
+	Runtime     = LogType{"✨", "Runtime", MagentaPair}
+	Debug       = LogType{"🔧", "Debug", GrayPair}
+	Network     = LogType{"🔌", "Network", BluePair}
+	Success     = LogType{"✔️ ", "Success", BrightGreenPair}
+	Warning     = LogType{"⚠️ ", "Warning", BrightYellowPair}
+	Error       = LogType{"⛔", "Error", RedPair}
+	Exception   = LogType{"💣", "Exception", RedPair}
+	Critical    = LogType{"🚨", "Critical", BrightRedPair}
+	Audit       = LogType{"📋", "Audit", YellowPair}
+	Trace       = LogType{"🔍", "Trace", LightBluePair}
+	Security    = LogType{"🔒", "Security", PurplePair}
+	UserAction  = LogType{"🧍", "User Action", CutePinkPair}
+	Performance = LogType{"⏱️ ", "Performance", PinkPair}
+	Config      = LogType{"⚙️ ", "Config", LightGrayPair}
+	Fatal       = LogType{"☠️ ", "Fatal", DarkRedPair}
 )
 
 type LoggerStyle string
 
 const (
-	FULL                      LoggerStyle = "<background><black><prefix>: <message>"
-	PREFIX                    LoggerStyle = "<background><black><prefix>:<reset> <foreground><message>"
-	SUFFIX                    LoggerStyle = "<foreground><prefix>: <background><black><message>"
-	TEXT_ONLY                 LoggerStyle = "<foreground><prefix>: <message>"
-	PREFIX_WHITE_TEXT         LoggerStyle = "<background><black><prefix>:<reset> <message>"
-	BRACKET_PREFIX            LoggerStyle = "<foreground><bold>[<prefix>]<reset><foreground> <message>"
-	BRACKET_PREFIX_WHITE_TEXT LoggerStyle = "<foreground><bold>[<prefix>] <reset><message>"
+	FULL                      LoggerStyle = "<background><black><emoji> <prefix>: <message>"
+	PREFIX                    LoggerStyle = "<background><black><emoji> <prefix>:<reset> <foreground><message>"
+	SUFFIX                    LoggerStyle = "<foreground><emoji> <prefix>: <background><black><message>"
+	TEXT_ONLY                 LoggerStyle = "<foreground><emoji> <prefix>: <message>"
+	PREFIX_WHITE_TEXT         LoggerStyle = "<background><black><emoji> <prefix>:<reset> <message>"
+	BRACKET_PREFIX            LoggerStyle = "<foreground><bold>[<emoji> <prefix>]<reset><foreground> <message>"
+	BRACKET_PREFIX_WHITE_TEXT LoggerStyle = "<foreground><bold>[<emoji> <prefix>] <reset><message>"
 )
 
 var LoggerSettings = struct {
-	LoggerStyle LoggerStyle
+	LoggerStyle       LoggerStyle
+	SaveToFile        bool
+	SaveDirectoryPath string
+	LogFileNameFormat string
 }{
-	LoggerStyle: PREFIX,
+	LoggerStyle:       PREFIX,
+	SaveToFile:        false,
+	SaveDirectoryPath: "",
+	LogFileNameFormat: "2006-01-02-150405",
+}
+
+var logFileName string = ""
+var logFile string = ""
+
+func InitLoggerFileWriter() {
+	logFileName = time.Now().Format(LoggerSettings.LogFileNameFormat)
+	if !strings.HasSuffix(LoggerSettings.SaveDirectoryPath, "/") {
+		LoggerSettings.SaveDirectoryPath += "/"
+	}
+
+	logFile = LoggerSettings.SaveDirectoryPath + logFileName + ".log"
+
+	_, err := os.Stat(logFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			panic(err)
+		}
+
+		os.MkdirAll(LoggerSettings.SaveDirectoryPath, fs.ModePerm)
+		os.Create(logFile)
+	}
+}
+
+func logToFile(message string, logType LogType) {
+	time := time.Now().Format("2006-01-02 15:04:05")
+	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	content := fmt.Sprintf("%s [%s] %s\n", time, strings.ToUpper(logType.Name), message)
+	if _, err := file.WriteString(content); err != nil {
+		panic(err)
+	}
 }
 
 func Log(message string, logType LogType) {
@@ -182,6 +228,10 @@ func Log(message string, logType LogType) {
 
 	pattern = replacePlaceholders(pattern, logType, message)
 	fmt.Println(pattern + RESET)
+
+	if LoggerSettings.SaveToFile {
+		logToFile(message, logType)
+	}
 }
 
 func LogException(err error) {
@@ -201,6 +251,7 @@ func replacePlaceholders(pattern string, logType LogType, message string) string
 	pattern = replaceAll(pattern, "<message>", message)
 	pattern = replaceAll(pattern, "<reset>", RESET)
 	pattern = replaceAll(pattern, "<bold>", BOLD)
+	pattern = replaceAll(pattern, "<emoji>", logType.Emoji)
 	return pattern
 }
 

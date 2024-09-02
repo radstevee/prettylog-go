@@ -12,6 +12,9 @@ var StdlibError = e.New("Death from the stdlib")
 
 func main() {
 	LoggerSettings.LoggerStyle = FULL
+	LoggerSettings.SaveToFile = true
+	LoggerSettings.SaveDirectoryPath = "./logs"
+	InitLoggerFileWriter()
 
 	Log("Running main() in Demo.go..", Debug)
 	Log("Very informative information", Information)
